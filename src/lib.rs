@@ -50,6 +50,13 @@ impl<Tz> DateTime<Tz> {
             second: second,
         }
     }
+
+    fn days_since_unix(&self) -> i32 {
+        (self.year - 1970) * 360
+        + leap_days_since_y0(self.year) - leap_days_since_y0(self.year)
+        + self.month.days_since_january_1st(self.year.into())
+        + i32::from(self.day - 1)
+    }
 }
 
 impl From<UnixTimestamp> for DateTime<Utc> {
@@ -73,13 +80,8 @@ impl From<UnixTimestamp> for DateTime<Utc> {
 
 impl From<DateTime<Utc>> for UnixTimestamp {
     fn from(datetime: DateTime<Utc>) -> Self {
-        let days_since_unix =
-            (datetime.year - 1970) * 360
-            + leap_days_since_y0(datetime.year) - leap_days_since_y0(datetime.year)
-            + datetime.month.days_since_january_1st(datetime.year.into())
-            + i32::from(datetime.day - 1);
         UnixTimestamp(
-            i64::from(days_since_unix) * SECONDS_PER_DAY
+            i64::from(datetime.days_since_unix()) * SECONDS_PER_DAY
             + i64::from(datetime.hour) * SECONDS_PER_HOUR
             + i64::from(datetime.minute) * SECONDS_PER_MINUTE
             + i64::from(datetime.second)
