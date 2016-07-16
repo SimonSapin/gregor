@@ -3,14 +3,18 @@ use std::time::{Duration, SystemTime, UNIX_EPOCH};
 include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
 
 
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Utc;
 
+#[derive(Debug, Eq, PartialEq, Clone)]
 pub struct DateTime<Tz> {
     pub time_zone: Tz,
     pub year: i32,
     pub month: Month,
+
     /// 1st of the month is day 1
     pub day: u8,
+
     pub hour: u8,
     pub minute: u8,
     pub second: u8,
@@ -28,6 +32,29 @@ impl<Tz> DateTime<Tz> {
             hour: hour,
             minute: minute,
             second: second,
+        }
+    }
+}
+
+impl From<SystemTime> for DateTime<Utc> {
+    fn from(system_time: SystemTime) -> Self {
+        let seconds_since_unix = match system_time.duration_since(UNIX_EPOCH) {
+            Ok(duration) => duration.as_secs() as i64,
+            Err(error) => -(error.duration().as_secs() as i64)
+        };
+        let days_since_unix = (seconds_since_unix / SECONDS_PER_DAY) as i32;
+        let days = days_since_unix + days_since_d0(1970);
+        let year = days * 400 / DAYS_PER_400YEARS;
+        let day_of_the_year = days - days_since_d0(year);
+        let (month, day) = Month::from_day_of_the_year(day_of_the_year, year.into());
+        DateTime {
+            time_zone: Utc,
+            year: year,
+            month: month,
+            day: day,
+            hour: ((seconds_since_unix / SECONDS_PER_HOUR) % 24) as u8,
+            minute: ((seconds_since_unix / SECONDS_PER_MINUTE) % 60) as u8,
+            second: (seconds_since_unix % 60) as u8,
         }
     }
 }
@@ -52,14 +79,19 @@ impl From<DateTime<Utc>> for SystemTime {
     }
 }
 
-/// How many leap days occured between March of year 0 and January of the given year
+/// How many leap days occured between January of year 0 and January of the given year
 /// (in Gregorian calendar).
-///
-/// March so that we don’t need count Feb 29 of year 0.
 fn leap_days_since_y0(year: i32) -> i32 {
-    let year = year - 1;
-    (year / 4) - (year / 100) + (year / 400)
+    let year = year - 1;  // Don’t include Feb 29 of the given year, if any.
+    // +1 because year 0 is a leap year.
+    ((year / 4) - (year / 100) + (year / 400)) + 1
 }
+
+/// Days between January 1st of year 0 and January 1st of the given year.
+fn days_since_d0(year: i32) -> i32 {
+    year * DAYS_PER_COMMON_YEAR + leap_days_since_y0(year)
+}
+
 
 const SECONDS_PER_MINUTE: i64 = 60;
 const SECONDS_PER_HOUR: i64 = SECONDS_PER_MINUTE * 60;
