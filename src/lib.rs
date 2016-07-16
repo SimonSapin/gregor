@@ -1,5 +1,8 @@
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
+include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
+
+
 pub struct Utc;
 
 pub struct DateTime<Tz> {
@@ -91,66 +94,6 @@ impl From<i32> for YearKind {
     }
 }
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub enum Month {
-    January,
-    February,
-    March,
-    April,
-    May,
-    June,
-    July,
-    August,
-    September,
-    October,
-    November,
-    December,
-}
-
-impl Month {
-    pub fn days(self, year_kind: YearKind) -> i32 {
-        match self {
-            Month::January => 31,
-            Month::February => match year_kind {
-                YearKind::Common => 28,
-                YearKind::Leap => 29,
-            },
-            Month::March => 31,
-            Month::April => 30,
-            Month::May => 31,
-            Month::June => 30,
-            Month::July => 31,
-            Month::August => 31,
-            Month::September => 30,
-            Month::October => 31,
-            Month::November => 30,
-            Month::December => 31,
-        }
-    }
-
-    fn days_since_january_1st(self, year_kind: YearKind) -> i32 {
-        use Month::*;
-        macro_rules! sum {
-            ( $( $earlier_month: ident )* ) => {
-                (0 $( + $earlier_month.days(year_kind) )*)
-            }
-        }
-        match self {
-            January => sum!(),
-            February => sum!(January),
-            March => sum!(January February),
-            April => sum!(January February March),
-            May => sum!(January February March April),
-            June => sum!(January February March April May),
-            July => sum!(January February March April May June),
-            August => sum!(January February March April May June July),
-            September => sum!(January February March April May June July August),
-            October => sum!(January February March April May June July August September),
-            November => sum!(January February March April May June July August September October),
-            December => sum!(January February March April May June July August September October November),
-        }
-    }
-}
 
 #[cfg(test)]
 mod tests {
