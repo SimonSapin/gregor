@@ -1,6 +1,41 @@
-use std::time::{Duration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 
 include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
+
+/// In seconds since 1970-01-01 00:00:00 UTC.
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub struct UnixTimestamp(i64);
+
+impl From<SystemTime> for UnixTimestamp {
+    fn from(t: SystemTime) -> Self {
+        UnixTimestamp(match t.duration_since(UNIX_EPOCH) {
+            Ok(duration) => duration.as_secs() as i64,
+            Err(error) => -(error.duration().as_secs() as i64)
+        })
+    }
+}
+
+impl From<UnixTimestamp> for SystemTime {
+    fn from(t: UnixTimestamp) -> Self {
+        if t.0 >= 0 {
+            UNIX_EPOCH + StdDuration::from_secs(t.0 as u64)
+        } else {
+            UNIX_EPOCH - StdDuration::from_secs((-t.0) as u64)
+        }
+    }
+}
+
+impl From<SystemTime> for DateTime<Utc> {
+    fn from(t: SystemTime) -> Self {
+        UnixTimestamp::from(t).into()
+    }
+}
+
+impl From<DateTime<Utc>> for SystemTime {
+    fn from(d: DateTime<Utc>) -> Self {
+        UnixTimestamp::from(d).into()
+    }
+}
 
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -36,13 +71,9 @@ impl<Tz> DateTime<Tz> {
     }
 }
 
-impl From<SystemTime> for DateTime<Utc> {
-    fn from(system_time: SystemTime) -> Self {
-        let seconds_since_unix = match system_time.duration_since(UNIX_EPOCH) {
-            Ok(duration) => duration.as_secs() as i64,
-            Err(error) => -(error.duration().as_secs() as i64)
-        };
-        let days_since_unix = (seconds_since_unix / SECONDS_PER_DAY) as i32;
+impl From<UnixTimestamp> for DateTime<Utc> {
+    fn from(u: UnixTimestamp) -> Self {
+        let days_since_unix = (u.0 / SECONDS_PER_DAY) as i32;
         let days = days_since_unix + days_since_d0(1970);
         let year = days * 400 / DAYS_PER_400YEARS;
         let day_of_the_year = days - days_since_d0(year);
@@ -52,30 +83,26 @@ impl From<SystemTime> for DateTime<Utc> {
             year: year,
             month: month,
             day: day,
-            hour: ((seconds_since_unix / SECONDS_PER_HOUR) % 24) as u8,
-            minute: ((seconds_since_unix / SECONDS_PER_MINUTE) % 60) as u8,
-            second: (seconds_since_unix % 60) as u8,
+            hour: ((u.0 / SECONDS_PER_HOUR) % 24) as u8,
+            minute: ((u.0 / SECONDS_PER_MINUTE) % 60) as u8,
+            second: (u.0 % 60) as u8,
         }
     }
 }
 
-impl From<DateTime<Utc>> for SystemTime {
+impl From<DateTime<Utc>> for UnixTimestamp {
     fn from(datetime: DateTime<Utc>) -> Self {
         let days_since_unix =
             (datetime.year - 1970) * 360
             + leap_days_since_y0(datetime.year) - leap_days_since_y0(datetime.year)
             + datetime.month.days_since_january_1st(datetime.year.into())
             + i32::from(datetime.day - 1);
-        let seconds_since_unix =
+        UnixTimestamp(
             i64::from(days_since_unix) * SECONDS_PER_DAY
             + i64::from(datetime.hour) * SECONDS_PER_HOUR
             + i64::from(datetime.minute) * SECONDS_PER_MINUTE
-            + i64::from(datetime.second);
-        if seconds_since_unix >= 0 {
-            UNIX_EPOCH + Duration::from_secs(seconds_since_unix as u64)
-        } else {
-            UNIX_EPOCH - Duration::from_secs((-seconds_since_unix) as u64)
-        }
+            + i64::from(datetime.second)
+        )
     }
 }
 
