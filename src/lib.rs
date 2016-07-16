@@ -52,16 +52,35 @@ impl<Tz> DateTime<Tz> {
     }
 
     fn days_since_unix(&self) -> i32 {
-        (self.year - 1970) * 360
-        + leap_days_since_y0(self.year) - leap_days_since_y0(self.year)
+        (self.year - 1970) * DAYS_PER_COMMON_YEAR
+        + leap_days_since_y0(self.year) - leap_days_since_y0(1970)
         + self.month.days_since_january_1st(self.year.into())
         + i32::from(self.day - 1)
     }
 }
 
+/// Integer divison that rounds towards negative infinity
+fn div_floor(dividend: i64, divisor: i64) -> i64 {
+    if dividend > 0 {
+        dividend / divisor
+    } else {
+        (dividend + 1 - divisor) / divisor
+    }
+}
+
+/// Remainder within range 0..divisor, even for negative dividend
+fn positive_rem(dividend: i64, divisor: i64) -> i64 {
+    let rem = dividend % divisor;
+    if rem < 0 {
+        rem + divisor
+    } else {
+        rem
+    }
+}
+
 impl From<UnixTimestamp> for DateTime<Utc> {
     fn from(u: UnixTimestamp) -> Self {
-        let days_since_unix = (u.0 / SECONDS_PER_DAY) as i32;
+        let days_since_unix = div_floor(u.0, SECONDS_PER_DAY) as i32;
         let days = days_since_unix + days_since_d0(1970);
         let year = days * 400 / DAYS_PER_400YEARS;
         let day_of_the_year = days - days_since_d0(year);
@@ -71,9 +90,9 @@ impl From<UnixTimestamp> for DateTime<Utc> {
             year: year,
             month: month,
             day: day,
-            hour: ((u.0 / SECONDS_PER_HOUR) % 24) as u8,
-            minute: ((u.0 / SECONDS_PER_MINUTE) % 60) as u8,
-            second: (u.0 % 60) as u8,
+            hour: positive_rem(div_floor(u.0, SECONDS_PER_HOUR), 24) as u8,
+            minute: positive_rem(div_floor(u.0, SECONDS_PER_MINUTE), 60) as u8,
+            second: positive_rem(u.0, 60) as u8,
         }
     }
 }
@@ -91,6 +110,8 @@ impl From<DateTime<Utc>> for UnixTimestamp {
 
 /// How many leap days occured between January of year 0 and January of the given year
 /// (in Gregorian calendar).
+//
+// FIXME: This may be incorrect for year negative years.
 fn leap_days_since_y0(year: i32) -> i32 {
     let year = year - 1;  // Don’t include Feb 29 of the given year, if any.
     // +1 because year 0 is a leap year.
@@ -141,10 +162,11 @@ impl From<i32> for YearKind {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use super::leap_days_since_y0;
+    use Month::*;
 
     #[test]
     fn fmt() {
-        use Month::*;
         assert_eq!(format!("{:?}", DateTime::new(Utc, 2016, July, 16, 20, 58, 46)),
                    "DateTime(Utc, 2016-07-16 20:58:46)");
     }
@@ -199,6 +221,58 @@ mod tests {
         assert_eq!(Month::October  .days_since_january_1st(YearKind::Leap), 274);
         assert_eq!(Month::November .days_since_january_1st(YearKind::Leap), 305);
         assert_eq!(Month::December .days_since_january_1st(YearKind::Leap), 335);
+    }
 
+    #[test]
+    fn counting_leap_days() {
+        assert_eq!(leap_days_since_y0(1970), 478);
+        assert_eq!(leap_days_since_y0(1971), 478);
+        assert_eq!(leap_days_since_y0(1972), 478);
+        assert_eq!(leap_days_since_y0(1973), 479);
+    }
+
+    #[test]
+    fn days_since_unix() {
+        assert_eq!(DateTime::new(Utc, 1969, December, 31, 0, 0, 0).days_since_unix(), -1);
+        assert_eq!(DateTime::new(Utc, 1970, January, 1, 0, 0, 0).days_since_unix(), 0);
+        assert_eq!(DateTime::new(Utc, 1970, January, 2, 0, 0, 0).days_since_unix(), 1);
+        assert_eq!(DateTime::new(Utc, 1970, February, 1, 0, 0, 0).days_since_unix(), 31);
+        assert_eq!(DateTime::new(Utc, 1971, January, 1, 0, 0, 0).days_since_unix(), 365);
+        assert_eq!(DateTime::new(Utc, 1972, January, 1, 0, 0, 0).days_since_unix(), 365 * 2);
+        // 1972 is a leap year.
+        assert_eq!(DateTime::new(Utc, 1973, January, 1, 0, 0, 0).days_since_unix(), 365 * 3 + 1);
+        assert_eq!(DateTime::new(Utc, 2016, July, 16, 0, 0, 0).days_since_unix(), 16998);
+    }
+
+    #[test]
+    fn conversions() {
+        macro_rules! assert_convertions {
+            ($timestamp: expr, $($e: expr),*) => {
+                let timestamp = UnixTimestamp($timestamp);
+                let datetime = DateTime::new(Utc, $($e),*);
+                assert_eq!(DateTime::<Utc>::from(timestamp), datetime);
+                assert_eq!(UnixTimestamp::from(datetime), timestamp);
+            }
+        }
+        // Python:
+        // import datetime
+        // datetime.datetime.fromutctimestamp(10000000000)
+//        assert_convertions!(-100_000_000_000, -1199, February, 15, 14, 22, 41);
+        assert_convertions!(-50_000_000_000, 385, July, 25, 7, 6, 40);
+        assert_convertions!(-1_000_000_000, 1938, April, 24, 22, 13, 20);
+        assert_convertions!(-10_000_000, 1969, September, 7, 6, 13, 20);
+        assert_convertions!(-1, 1969, December, 31, 23, 59, 59);
+        assert_convertions!(0, 1970, January, 1, 0, 0, 0);
+        assert_convertions!(1, 1970, January, 1, 0, 0, 1);
+        assert_convertions!(100_000, 1970, January, 2, 3, 46, 40);
+        assert_convertions!(1_000_000, 1970, January, 12, 13, 46, 40);
+        assert_convertions!(10_000_000, 1970, April, 26, 17, 46, 40);
+        assert_convertions!(100_000_000, 1973, March, 3, 9, 46, 40);
+        assert_convertions!(946_684_800, 2000, January, 1, 0, 0, 0);
+        assert_convertions!(1_000_000_000, 2001, September, 9, 1, 46, 40);
+        assert_convertions!(1_468_627_200, 2016, July, 16, 0, 0, 0);
+        assert_convertions!(1_468_702_726, 2016, July, 16, 20, 58, 46);
+        assert_convertions!(10_000_000_000, 2286, November, 20, 17, 46, 40);
+        assert_convertions!(400_000_000_000, 14645, June, 30, 15, 6, 40);
     }
 }

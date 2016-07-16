@@ -67,15 +67,15 @@ fn main() {
     w!("        match year_kind {{");
     w!("            YearKind::Common => match day {{");
     for &(name, _, (first, last), _) in &months {
-        w!("                {}...{} => (Month::{}, (day - {}) as u8),", first, last, name, first);
+        w!("                {}...{} => (Month::{}, (day - {} + 1) as u8),", first, last, name, first);
     }
-    w!("                _ => panic!(\"Day of the year out of range\")");
+    w!("                _ => panic!(\"Day #{{}} of the year is out of range\", day)");
     w!("            }},");
     w!("            YearKind::Leap => match day {{");
     for &(name, _, _, (first, last)) in &months {
-        w!("                {}...{} => (Month::{}, (day - {}) as u8),", first, last, name, first);
+        w!("                {}...{} => (Month::{}, (day - {} + 1) as u8),", first, last, name, first);
     }
-    w!("                _ => panic!(\"Day of the year out of range\")");
+    w!("                _ => panic!(\"Day #{{}} of the year is out of range\", day)");
     w!("            }},");
     w!("        }}");
     w!("    }}");
