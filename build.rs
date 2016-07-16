@@ -16,14 +16,16 @@ fn main() {
         ("October", 31, 31),
         ("November", 30, 30),
         ("December", 31, 31),
-    ].iter().scan((0, 0), |&mut (ref mut running_sum_common, ref mut running_sum_leap),
+    ].iter().scan((1, 0, 0), |&mut (ref mut number, ref mut running_sum_common, ref mut running_sum_leap),
                            &(name, length_common, length_leap)| {
         let month = (
             name,
+            *number,
             // First and last day of the month, where 0 is January 1st and 355 or 366 is December 31st.
             (*running_sum_common, *running_sum_common + length_common - 1),
             (*running_sum_leap, *running_sum_leap + length_leap - 1)
         );
+        *number += 1;
         *running_sum_common += length_common;
         *running_sum_leap += length_leap;
         Some(month)
@@ -37,8 +39,8 @@ fn main() {
 
     w!("#[derive(Debug, Eq, PartialEq, Copy, Clone)]");
     w!("pub enum Month {{");
-    for &(name, _, _) in &months {
-        w!("    {},", name);
+    for &(name, number, _, _) in &months {
+        w!("    {} = {},", name, number);
     }
     w!("}}");
     w!("");
@@ -47,12 +49,12 @@ fn main() {
     w!("    fn days_since_january_1st(self, year_kind: YearKind) -> i32 {{");
     w!("        match year_kind {{");
     w!("            YearKind::Common => match self {{");
-    for &(name, (first, _), _) in &months {
+    for &(name, _, (first, _), _) in &months {
         w!("                Month::{} => {},", name, first);
     }
     w!("            }},");
     w!("            YearKind::Leap => match self {{");
-    for &(name, _, (first, _)) in &months {
+    for &(name, _, _, (first, _)) in &months {
         w!("                Month::{} => {},", name, first);
     }
     w!("            }},");
@@ -64,13 +66,13 @@ fn main() {
     w!("    fn from_day_of_the_year(day: i32, year_kind: YearKind) -> (Month, u8) {{");
     w!("        match year_kind {{");
     w!("            YearKind::Common => match day {{");
-    for &(name, (first, last), _) in &months {
+    for &(name, _, (first, last), _) in &months {
         w!("                {}...{} => (Month::{}, (day - {}) as u8),", first, last, name, first);
     }
     w!("                _ => panic!(\"Day of the year out of range\")");
     w!("            }},");
     w!("            YearKind::Leap => match day {{");
-    for &(name, _, (first, last)) in &months {
+    for &(name, _, _, (first, last)) in &months {
         w!("                {}...{} => (Month::{}, (day - {}) as u8),", first, last, name, first);
     }
     w!("                _ => panic!(\"Day of the year out of range\")");

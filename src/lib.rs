@@ -1,5 +1,7 @@
 #![no_std]
 
+use core::fmt;
+
 #[cfg(feature = "system_time")]
 mod system_time;
 
@@ -12,7 +14,7 @@ pub struct UnixTimestamp(i64);
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Utc;
 
-#[derive(Debug, Eq, PartialEq, Clone)]
+#[derive(Eq, PartialEq, Copy, Clone)]
 pub struct DateTime<Tz> {
     pub time_zone: Tz,
     pub year: i32,
@@ -24,6 +26,14 @@ pub struct DateTime<Tz> {
     pub hour: u8,
     pub minute: u8,
     pub second: u8,
+}
+
+impl<Tz: fmt::Debug> fmt::Debug for DateTime<Tz> {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "DateTime({:?}, {:04}-{:02}-{:02} {:02}:{:02}:{:02})",
+               self.time_zone, self.year, self.month as u8, self.day,
+               self.hour, self.minute, self.second)
+    }
 }
 
 impl<Tz> DateTime<Tz> {
@@ -124,10 +134,18 @@ impl From<i32> for YearKind {
     }
 }
 
+#[cfg(test)] #[macro_use] extern crate std;
 
 #[cfg(test)]
 mod tests {
-    use super::{YearKind, Month};
+    use super::*;
+
+    #[test]
+    fn fmt() {
+        use Month::*;
+        assert_eq!(format!("{:?}", DateTime::new(Utc, 2016, July, 16, 20, 58, 46)),
+                   "DateTime(Utc, 2016-07-16 20:58:46)");
+    }
 
     #[test]
     fn leap_year() {
