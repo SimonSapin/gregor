@@ -128,7 +128,9 @@ const SECONDS_PER_MINUTE: i64 = 60;
 const SECONDS_PER_HOUR: i64 = SECONDS_PER_MINUTE * 60;
 const SECONDS_PER_DAY: i64 = SECONDS_PER_HOUR * 24;
 
-/// The Gregorian calendar cycles every 400 years. In one cycle, there are:
+/// The leap year schedule of the Gregorian calendar cycles every 400 years.
+/// In one cycle, there are:
+///
 /// * 100 years multiple of 4
 /// * 4 years multiple of 100
 /// * 1 year multiple of 400
@@ -254,9 +256,15 @@ mod tests {
                 assert_eq!(UnixTimestamp::from(datetime), timestamp);
             }
         }
+
         // Python:
         // import datetime
         // datetime.datetime.fromutctimestamp(10000000000)
+
+        // GNU coreutils:
+        // date +%s -d 2000-1-1T00:00:00Z
+        // TZ=Etc/UTC date -d @10000000000
+
 //        assert_convertions!(-100_000_000_000, -1199, February, 15, 14, 22, 41);
         assert_convertions!(-50_000_000_000, 385, July, 25, 7, 6, 40);
         assert_convertions!(-1_000_000_000, 1938, April, 24, 22, 13, 20);
@@ -274,5 +282,23 @@ mod tests {
         assert_convertions!(1_468_702_726, 2016, July, 16, 20, 58, 46);
         assert_convertions!(10_000_000_000, 2286, November, 20, 17, 46, 40);
         assert_convertions!(400_000_000_000, 14645, June, 30, 15, 6, 40);
+    }
+
+    #[cfg(feature = "system_time")]
+    #[test]
+    fn system_time() {
+        use std::time::{Duration, SystemTime, UNIX_EPOCH};
+
+        assert_eq!(DateTime::<Utc>::from(UNIX_EPOCH),
+                   DateTime::new(Utc, 1970, January, 1, 0, 0, 0));
+
+        assert_eq!(DateTime::<Utc>::from(UNIX_EPOCH + Duration::from_secs(1_468_702_726)),
+                   DateTime::new(Utc, 2016, July, 16, 20, 58, 46));
+
+        assert_eq!(SystemTime::from(DateTime::new(Utc, 1970, January, 1, 0, 0, 0)),
+                   UNIX_EPOCH);
+
+        assert_eq!(SystemTime::from(DateTime::new(Utc, 2016, July, 16, 20, 58, 46)),
+                   UNIX_EPOCH + Duration::from_secs(1_468_702_726));
     }
 }
