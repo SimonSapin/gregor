@@ -6,3 +6,6 @@ description = "Simple implementation of the Gregorian calendar."
 repository = "https://github.com/SimonSapin/gregor"
 license = "MIT"
 build = "build.rs"
+
+[features]
+system_time = []

@@ -1,42 +1,13 @@
-use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
+#![no_std]
+
+#[cfg(feature = "system_time")]
+mod system_time;
 
 include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
 
 /// In seconds since 1970-01-01 00:00:00 UTC.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct UnixTimestamp(i64);
-
-impl From<SystemTime> for UnixTimestamp {
-    fn from(t: SystemTime) -> Self {
-        UnixTimestamp(match t.duration_since(UNIX_EPOCH) {
-            Ok(duration) => duration.as_secs() as i64,
-            Err(error) => -(error.duration().as_secs() as i64)
-        })
-    }
-}
-
-impl From<UnixTimestamp> for SystemTime {
-    fn from(t: UnixTimestamp) -> Self {
-        if t.0 >= 0 {
-            UNIX_EPOCH + StdDuration::from_secs(t.0 as u64)
-        } else {
-            UNIX_EPOCH - StdDuration::from_secs((-t.0) as u64)
-        }
-    }
-}
-
-impl From<SystemTime> for DateTime<Utc> {
-    fn from(t: SystemTime) -> Self {
-        UnixTimestamp::from(t).into()
-    }
-}
-
-impl From<DateTime<Utc>> for SystemTime {
-    fn from(d: DateTime<Utc>) -> Self {
-        UnixTimestamp::from(d).into()
-    }
-}
-
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Utc;
