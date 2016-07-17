@@ -8,14 +8,13 @@ fn main() {
         ($($tt: tt)*) => {{ writeln!(f, $($tt)*).unwrap(); }}
     }
 
-    let mut number = 1;
     let mut running_sum_common = 0;
     let mut running_sum_leap = 0;
 
     w!("macro_rules! with_month_data {{");
     w!("    ($macro_name: ident) => {{");
     w!("        $macro_name! {{");
-    for &(name, length_common, length_leap) in &[
+    for (i, &(name, length_common, length_leap)) in [
         ("January", 31, 31),
         ("February", 28, 29),
         ("March", 31, 31),
@@ -28,9 +27,9 @@ fn main() {
         ("October", 31, 31),
         ("November", 30, 30),
         ("December", 31, 31),
-    ] {
+    ].iter().enumerate() {
         w!("{} {{", name);
-        w!("    number = {},", number);
+        w!("    number = {},", i + 1);  // i starts at 0
         w!("    common_years = {{ first_day = {}, last_day = {}, }},",
            running_sum_common,
            running_sum_common + length_common - 1);
@@ -38,7 +37,6 @@ fn main() {
            running_sum_leap,
            running_sum_leap + length_leap - 1);
         w!("}},");
-        number += 1;
         running_sum_common += length_common;
         running_sum_leap += length_leap;
     }
