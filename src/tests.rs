@@ -1,5 +1,5 @@
 use super::*;
-use super::leap_days_since_y0;
+use time_zones::{days_since_unix, leap_days_since_y0};
 use Month::*;
 
 #[test]
@@ -69,16 +69,16 @@ fn counting_leap_days() {
 }
 
 #[test]
-fn days_since_unix() {
-    assert_eq!(NaiveDateTime::new(1969, December, 31, 0, 0, 0).days_since_unix(), -1);
-    assert_eq!(NaiveDateTime::new(1970, January, 1, 0, 0, 0).days_since_unix(), 0);
-    assert_eq!(NaiveDateTime::new(1970, January, 2, 0, 0, 0).days_since_unix(), 1);
-    assert_eq!(NaiveDateTime::new(1970, February, 1, 0, 0, 0).days_since_unix(), 31);
-    assert_eq!(NaiveDateTime::new(1971, January, 1, 0, 0, 0).days_since_unix(), 365);
-    assert_eq!(NaiveDateTime::new(1972, January, 1, 0, 0, 0).days_since_unix(), 365 * 2);
+fn unixy_days() {
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1969, December, 31, 0, 0, 0)), -1);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1970, January, 1, 0, 0, 0)), 0);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1970, January, 2, 0, 0, 0)), 1);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1970, February, 1, 0, 0, 0)), 31);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1971, January, 1, 0, 0, 0)), 365);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1972, January, 1, 0, 0, 0)), 365 * 2);
     // 1972 is a leap year.
-    assert_eq!(NaiveDateTime::new(1973, January, 1, 0, 0, 0).days_since_unix(), 365 * 3 + 1);
-    assert_eq!(NaiveDateTime::new(2016, July, 16, 0, 0, 0).days_since_unix(), 16998);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(1973, January, 1, 0, 0, 0)), 365 * 3 + 1);
+    assert_eq!(days_since_unix(&NaiveDateTime::new(2016, July, 16, 0, 0, 0)), 16998);
 }
 
 #[test]
