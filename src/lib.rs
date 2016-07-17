@@ -16,7 +16,7 @@ include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
 pub struct UnixTimestamp(pub i64);
 
 #[derive(Eq, PartialEq, Copy, Clone)]
-pub struct DateTime<Tz> {
+pub struct DateTime<Tz: TimeZone> {
     pub naive: NaiveDateTime,
     pub time_zone: Tz,
 }
@@ -39,7 +39,7 @@ pub struct NaiveDateTime {
     pub second: u8,
 }
 
-impl<Tz: fmt::Debug> fmt::Debug for DateTime<Tz> {
+impl<Tz: fmt::Debug + TimeZone> fmt::Debug for DateTime<Tz> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "DateTime({:?}, {:?})", self.time_zone, self.naive)
     }
@@ -53,7 +53,7 @@ impl fmt::Debug for NaiveDateTime {
     }
 }
 
-impl<Tz> DateTime<Tz> {
+impl<Tz: TimeZone> DateTime<Tz> {
     pub fn new(time_zone: Tz, year: i32, month: Month, day: u8,
                hour: u8, minute: u8, second: u8)
                -> Self {
@@ -69,6 +69,13 @@ impl<Tz> DateTime<Tz> {
     pub fn hour(&self) -> u8 { self.naive.hour }
     pub fn minute(&self) -> u8 { self.naive.minute }
     pub fn second(&self) -> u8 { self.naive.second }
+
+    pub fn from_timestamp(t: UnixTimestamp, time_zone: Tz) -> Self {
+        DateTime {
+            naive: time_zone.from_timestamp(t),
+            time_zone: time_zone,
+        }
+    }
 }
 
 impl NaiveDateTime {
