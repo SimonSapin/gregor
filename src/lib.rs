@@ -17,7 +17,12 @@ pub struct Utc;
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct DateTime<Tz> {
     pub time_zone: Tz,
+
+    /// Year number per ISO 8601.
+    ///
+    /// For example, 2016 AC is +2016, 1 AC is +1, 1 BC is 0, 2 BC is -1, etc.
     pub year: i32,
+
     pub month: Month,
 
     /// 1st of the month is day 1
@@ -82,7 +87,7 @@ impl From<UnixTimestamp> for DateTime<Utc> {
     fn from(u: UnixTimestamp) -> Self {
         let days_since_unix = div_floor(u.0, SECONDS_PER_DAY) as i32;
         let days = days_since_unix + days_since_d0(1970);
-        let year = days * 400 / DAYS_PER_400YEARS;
+        let year = div_floor(i64::from(days) * 400, i64::from(DAYS_PER_400YEARS)) as i32;
         let day_of_the_year = days - days_since_d0(year);
         let (month, day) = Month::from_day_of_the_year(day_of_the_year, year.into());
         DateTime {
@@ -113,9 +118,14 @@ impl From<DateTime<Utc>> for UnixTimestamp {
 //
 // FIXME: This may be incorrect for year negative years.
 fn leap_days_since_y0(year: i32) -> i32 {
-    let year = year - 1;  // Don’t include Feb 29 of the given year, if any.
-    // +1 because year 0 is a leap year.
-    ((year / 4) - (year / 100) + (year / 400)) + 1
+    if year > 0 {
+        let year = year - 1;  // Don’t include Feb 29 of the given year, if any.
+        // +1 because year 0 is a leap year.
+        ((year / 4) - (year / 100) + (year / 400)) + 1
+    } else {
+        let year = -year;
+        -((year / 4) - (year / 100) + (year / 400))
+    }
 }
 
 /// Days between January 1st of year 0 and January 1st of the given year.
@@ -257,6 +267,13 @@ mod tests {
             }
         }
 
+        // https://www.wolframalpha.com/input/?i=100000000000+seconds+before+Unix+epoch
+        // > 2:13:20 pm UTC  |  Thursday, February 15, 1200 BC (extrapolated Gregorian calendar)
+        //
+        // For some reason GNU coreutils uses local mean time instead of UTC
+        // with TZ=Etc/UTC for year -1199.
+        assert_convertions!(-100_000_000_000, -1199, February, 15, 14, 13, 20);
+
         // Python:
         // import datetime
         // datetime.datetime.fromutctimestamp(10000000000)
@@ -265,7 +282,9 @@ mod tests {
         // date +%s -d 2000-1-1T00:00:00Z
         // TZ=Etc/UTC date -d @10000000000
 
-//        assert_convertions!(-100_000_000_000, -1199, February, 15, 14, 22, 41);
+        assert_convertions!(-62_167_219_200, 0, January, 1, 0, 0, 0);
+        assert_convertions!(-62_162_035_201, 0, February, 29, 23, 59, 59);  // Y0 / 1 BC is leap
+        assert_convertions!(-62_162_035_200, 0, March, 1, 0, 0, 0);
         assert_convertions!(-50_000_000_000, 385, July, 25, 7, 6, 40);
         assert_convertions!(-1_000_000_000, 1938, April, 24, 22, 13, 20);
         assert_convertions!(-10_000_000, 1969, September, 7, 6, 13, 20);
