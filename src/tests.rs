@@ -145,3 +145,14 @@ fn system_time() {
     assert_eq!(SystemTime::from(DateTime::new(Utc, 2016, July, 16, 20, 58, 46)),
                UNIX_EPOCH + Duration::from_secs(1_468_702_726));
 }
+
+#[test]
+fn fixed_offset_from_utc() {
+    let tz = FixedOffsetFromUtc::from_hours_and_minutes(2, 0);
+    let t = UnixTimestamp(1468769652);
+    let dt = NaiveDateTime::new(2016, July, 17, 17, 34, 12);
+    let utc_dt = NaiveDateTime::new(2016, July, 17, 15, 34, 12);
+    assert_eq!(tz.to_timestamp(&dt), t);
+    assert_eq!(tz.from_timestamp(t), dt);
+    assert_eq!(Utc.from_timestamp(t), utc_dt);
+}

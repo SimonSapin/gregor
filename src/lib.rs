@@ -6,7 +6,7 @@
 #[cfg(test)] mod tests;
 mod time_zones;
 
-pub use time_zones::{TimeZone, Utc};
+pub use time_zones::{TimeZone, Utc, FixedOffsetFromUtc};
 use core::fmt;
 
 include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));

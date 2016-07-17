@@ -8,6 +8,37 @@ pub trait TimeZone {
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
 pub struct Utc;
 
+/// The offset is typically positive east of Greenwhich (longitude 0°), negative west.
+///
+/// For example, Japan Standard Time is UTC+09:00:
+///
+/// ```rust
+/// use gregor::FixedOffsetFromUtc;
+/// let jst = FixedOffsetFromUtc::from_hours_and_minutes(9, 0);
+/// ```
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
+pub struct FixedOffsetFromUtc {
+    seconds_ahead_of_utc: i32,
+}
+
+impl FixedOffsetFromUtc {
+    pub fn from_hours_and_minutes(hours: i32, minutes: i32) -> Self {
+        FixedOffsetFromUtc {
+            seconds_ahead_of_utc: (hours * 60 + minutes) * 60,
+        }
+    }
+}
+
+impl TimeZone for FixedOffsetFromUtc {
+    fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
+        Utc.from_timestamp(UnixTimestamp(u.0 + i64::from(self.seconds_ahead_of_utc)))
+    }
+
+    fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
+        UnixTimestamp(Utc.to_timestamp(d).0 - i64::from(self.seconds_ahead_of_utc))
+    }
+}
+
 /// Integer divison that rounds towards negative infinity
 // This is a macro in order to work with either i32 or i64.
 // Generic integers with traits are a pain.
