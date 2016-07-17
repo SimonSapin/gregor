@@ -7,8 +7,10 @@ mod num;
 #[cfg(test)] mod tests;
 mod time_zones;
 
-pub use time_zones::{TimeZone, Utc, FixedOffsetFromUtc};
 use core::fmt;
+use num::positive_rem;
+use time_zones::days_since_unix;
+pub use time_zones::{TimeZone, Utc, FixedOffsetFromUtc};
 
 /// In seconds since 1970-01-01 00:00:00 UTC.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -69,6 +71,8 @@ impl<Tz: TimeZone> DateTime<Tz> {
     pub fn minute(&self) -> u8 { self.naive.minute }
     pub fn second(&self) -> u8 { self.naive.second }
 
+    pub fn day_of_the_week(&self) -> DayOfTheWeek { self.naive.day_of_the_week() }
+
     pub fn from_timestamp(t: UnixTimestamp, time_zone: Tz) -> Self {
         DateTime {
             naive: time_zone.from_timestamp(t),
@@ -87,6 +91,13 @@ impl NaiveDateTime {
             minute: minute,
             second: second,
         }
+    }
+
+    pub fn day_of_the_week(&self) -> DayOfTheWeek {
+        const JANUARY_1ST_1970: DayOfTheWeek = DayOfTheWeek::Thursday;
+        let number = i32::from(JANUARY_1ST_1970.to_iso_number()) + days_since_unix(self);
+        let number = positive_rem((number - 1), 7) + 1;  // Normalize to 1...7
+        DayOfTheWeek::from_iso_number(number as u8).unwrap()
     }
 }
 

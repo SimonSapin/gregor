@@ -174,3 +174,25 @@ fn numbers() {
     assert_eq!(DayOfTheWeek::from_iso_number(7), Some(Sunday));
     assert_eq!(DayOfTheWeek::from_iso_number(8), None);
 }
+
+#[test]
+fn day_of_the_week() {
+    assert_eq!(NaiveDateTime::new(2016, July, 17, 0, 0, 0).day_of_the_week(), Sunday);
+    assert_eq!(NaiveDateTime::new(2000, January, 1, 0, 0, 0).day_of_the_week(), Saturday);
+    assert_eq!(NaiveDateTime::new(1970, January, 1, 0, 0, 0).day_of_the_week(), Thursday);
+    assert_eq!(NaiveDateTime::new(1837, May, 3, 0, 0, 0).day_of_the_week(), Wednesday);
+
+
+    // https://en.wikipedia.org/wiki/Week
+    // > Adding one to the remainder after dividing by seven a date's Julian day number
+    // > (JD modulo 7 + 1) yields that date's ISO 8601 day of the week,[3]
+    //
+    // > This is equivalent to saying that JD0,
+    // > i.e. 1 January 4713 BC of the proleptic Julian calendar, was a Monday.
+
+    // https://en.wikipedia.org/wiki/Julian_day
+    // > Julian day number 0 assigned to the day starting at noon
+    // > on January 1, 4713 BC, proleptic Julian calendar
+    // > (November 24, 4714 BC, in the proleptic Gregorian calendar)
+    assert_eq!(NaiveDateTime::new(-4713, November, 24, 0, 0, 0).day_of_the_week(), Monday);
+}
