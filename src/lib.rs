@@ -9,8 +9,6 @@ mod time_zones;
 pub use time_zones::{TimeZone, Utc, FixedOffsetFromUtc};
 use core::fmt;
 
-include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
-
 /// In seconds since 1970-01-01 00:00:00 UTC.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct UnixTimestamp(pub i64);
@@ -127,3 +125,73 @@ impl From<i32> for YearKind {
         }
     }
 }
+
+macro_rules! declare_month {
+    (
+        $(
+            $name: ident {
+                number = $number: expr,
+                common_years = {
+                    first_day = $first_day_in_common_years: expr,
+                    last_day = $last_day_in_common_years: expr,
+                },
+                leap_years = {
+                    first_day = $first_day_in_leap_years: expr,
+                    last_day = $last_day_in_leap_years: expr,
+                },
+            },
+        )+
+    ) => {
+        #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+        pub enum Month {
+            $(
+                $name = $number,
+            )+
+        }
+
+        impl Month {
+            /// Days between Jan 1st and the first day of this month.
+            fn days_since_january_1st(self, year_kind: YearKind) -> i32 {
+                match year_kind {
+                    YearKind::Common => match self {
+                        $(
+                            Month::$name => $first_day_in_common_years,
+                        )+
+                    },
+                    YearKind::Leap => match self {
+                        $(
+                            Month::$name => $first_day_in_leap_years,
+                        )+
+                    },
+                }
+            }
+
+            /// In: 0 for Jan 1st, 365 or 366 for Dec 31.
+            /// Out: Month and day of the month (1 for the first day).
+            fn from_day_of_the_year(day: i32, year_kind: YearKind) -> (Month, u8) {
+                match year_kind {
+                    YearKind::Common => match day {
+                        $(
+                            $first_day_in_common_years ... $last_day_in_leap_years => {
+                                (Month::$name, (day - $first_day_in_common_years + 1) as u8)
+                            }
+                        )+
+                        _ => panic!("Day #{} of the year is out of range", day)
+                    },
+                    YearKind::Leap => match day {
+                        $(
+                            $first_day_in_leap_years ... $last_day_in_leap_years => {
+                                (Month::$name, (day - $first_day_in_leap_years + 1) as u8)
+                            }
+                        )+
+                        _ => panic!("Day #{} of the year is out of range", day)
+                    },
+                }
+            }
+        }
+    }
+}
+
+include!(concat!(env!("OUT_DIR"), "/generated_data.rs"));
+
+with_month_data!(declare_month);
