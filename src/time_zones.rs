@@ -6,10 +6,11 @@ pub trait TimeZone {
     fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp;
 }
 
+/// The *Coordinated Universal Time* time time zone.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
 pub struct Utc;
 
-/// The offset is typically positive east of Greenwhich (longitude 0°), negative west.
+/// The offset is typically positive east of Greenwich (longitude 0°), negative west.
 ///
 /// For example, Japan Standard Time is UTC+09:00:
 ///
@@ -32,11 +33,26 @@ impl FixedOffsetFromUtc {
 
 impl TimeZone for FixedOffsetFromUtc {
     fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
-        Utc.from_timestamp(UnixTimestamp(u.0 + i64::from(self.seconds_ahead_of_utc)))
+        // When local time is ahead of UTC (positive offset)
+        // that instant happened before midnight UTC
+        // so there are more seconds since then.
+        // (Add the offset rather than subtract it.)
+
+        // Seconds since *this time zone*’s midnight of 1970-01-01.
+        let seconds = u.0 + i64::from(self.seconds_ahead_of_utc);
+
+        // This is not really a Unix timestamp or a UTC date-time,
+        // but the two errors compensate to give a date-time in this time zone.
+        Utc.from_timestamp(UnixTimestamp(seconds))
     }
 
     fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
-        UnixTimestamp(Utc.to_timestamp(d).0 - i64::from(self.seconds_ahead_of_utc))
+        // Pretend this is UTC to obtain seconds since *this time zone*’s midnight of 1970-01-01.
+        let seconds = Utc.to_timestamp(d).0;
+
+        // For positives offsets (ahead of UTC) this is earlier in time than UTC midnight
+        // (with more seconds), so *subtract* the offset to make a Unix timestamp.
+        UnixTimestamp(seconds - i64::from(self.seconds_ahead_of_utc))
     }
 }
 
@@ -70,7 +86,7 @@ pub fn days_since_unix(d: &NaiveDateTime) -> i32 {
     + i32::from(d.day - 1)
 }
 
-/// How many leap days occured between January of year 0 and January of the given year
+/// How many leap days occurred between January of year 0 and January of the given year
 /// (in Gregorian calendar).
 pub fn leap_days_since_y0(year: i32) -> i32 {
     if year > 0 {
