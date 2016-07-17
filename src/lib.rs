@@ -10,7 +10,8 @@ mod time_zones;
 use core::fmt;
 use num::positive_rem;
 use time_zones::days_since_unix;
-pub use time_zones::{TimeZone, Utc, FixedOffsetFromUtc};
+pub use time_zones::{TimeZone, AmbiguousLocalTimeError, UnambiguousTimeZone,
+                     Utc, FixedOffsetFromUtc};
 
 /// In seconds since 1970-01-01 00:00:00 UTC.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -111,9 +112,9 @@ impl<Tz: Default + TimeZone> From<UnixTimestamp> for DateTime<Tz> {
     }
 }
 
-impl<Tz: TimeZone> From<DateTime<Tz>> for UnixTimestamp {
+impl<Tz: UnambiguousTimeZone> From<DateTime<Tz>> for UnixTimestamp {
     fn from(datetime: DateTime<Tz>) -> Self {
-        datetime.time_zone.to_timestamp(&datetime.naive)
+        datetime.time_zone.to_unambiguous_timestamp(&datetime.naive)
     }
 }
 

@@ -153,7 +153,7 @@ fn fixed_offset_from_utc() {
     let t = UnixTimestamp(1468769652);
     let dt = NaiveDateTime::new(2016, July, 17, 17, 34, 12);
     let utc_dt = NaiveDateTime::new(2016, July, 17, 15, 34, 12);
-    assert_eq!(tz.to_timestamp(&dt), t);
+    assert_eq!(tz.to_unambiguous_timestamp(&dt), t);
     assert_eq!(tz.from_timestamp(t), dt);
     assert_eq!(Utc.from_timestamp(t), utc_dt);
 }

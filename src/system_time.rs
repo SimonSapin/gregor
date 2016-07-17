@@ -1,5 +1,5 @@
 use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
-use super::{UnixTimestamp, DateTime, TimeZone};
+use super::{UnixTimestamp, DateTime, TimeZone, UnambiguousTimeZone};
 
 impl From<SystemTime> for UnixTimestamp {
     fn from(t: SystemTime) -> Self {
@@ -26,7 +26,7 @@ impl<Tz: Default + TimeZone> From<SystemTime> for DateTime<Tz> {
     }
 }
 
-impl<Tz: TimeZone> From<DateTime<Tz>> for SystemTime {
+impl<Tz: UnambiguousTimeZone> From<DateTime<Tz>> for SystemTime {
     fn from(d: DateTime<Tz>) -> Self {
         UnixTimestamp::from(d).into()
     }

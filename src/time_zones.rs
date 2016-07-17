@@ -3,12 +3,27 @@ use num::{div_floor, positive_rem};
 
 pub trait TimeZone {
     fn from_timestamp(&self, t: UnixTimestamp) -> NaiveDateTime;
-    fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp;
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, AmbiguousLocalTimeError>;
+}
+
+/// When daylight saving makes clock go "back", the same local time hour happens twice in a row.
+/// This makes that local time ambiguous to convert to an instant.
+/// This error type is return for such a conversion.
+#[derive(Debug)]
+pub struct AmbiguousLocalTimeError;
+
+/// Implemented for time zones where `AmbiguousLocalTimeError` never occurs.
+pub trait UnambiguousTimeZone: TimeZone {
+    fn to_unambiguous_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
+        self.to_timestamp(d).unwrap()
+    }
 }
 
 /// The *Coordinated Universal Time* time time zone.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
 pub struct Utc;
+
+impl UnambiguousTimeZone for Utc {}
 
 impl TimeZone for Utc {
     fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
@@ -23,13 +38,13 @@ impl TimeZone for Utc {
         NaiveDateTime::new(year, month, day, hour, minute, second)
     }
 
-    fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
-        UnixTimestamp(
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, AmbiguousLocalTimeError> {
+        Ok(UnixTimestamp(
             i64::from(days_since_unix(d)) * SECONDS_PER_DAY
             + i64::from(d.hour) * SECONDS_PER_HOUR
             + i64::from(d.minute) * SECONDS_PER_MINUTE
             + i64::from(d.second)
-        )
+        ))
     }
 }
 
@@ -54,6 +69,8 @@ impl FixedOffsetFromUtc {
     }
 }
 
+impl UnambiguousTimeZone for FixedOffsetFromUtc {}
+
 impl TimeZone for FixedOffsetFromUtc {
     fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
         // When local time is ahead of UTC (positive offset)
@@ -69,13 +86,13 @@ impl TimeZone for FixedOffsetFromUtc {
         Utc.from_timestamp(UnixTimestamp(seconds))
     }
 
-    fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, AmbiguousLocalTimeError> {
         // Pretend this is UTC to obtain seconds since *this time zone*’s midnight of 1970-01-01.
-        let seconds = Utc.to_timestamp(d).0;
+        let seconds = Utc.to_unambiguous_timestamp(d).0;
 
         // For positives offsets (ahead of UTC) this is earlier in time than UTC midnight
         // (with more seconds), so *subtract* the offset to make a Unix timestamp.
-        UnixTimestamp(seconds - i64::from(self.seconds_ahead_of_utc))
+        Ok(UnixTimestamp(seconds - i64::from(self.seconds_ahead_of_utc)))
     }
 }
 
