@@ -9,7 +9,7 @@ include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
 
 /// In seconds since 1970-01-01 00:00:00 UTC.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
-pub struct UnixTimestamp(i64);
+pub struct UnixTimestamp(pub i64);
 
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct Utc;

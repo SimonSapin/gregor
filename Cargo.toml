@@ -1,6 +1,6 @@
 [package]
 name = "gregor"
-version = "0.2.1"
+version = "0.2.2"
 authors = ["Simon Sapin <simon.sapin@exyr.org>"]
 description = "Simple implementation of the Gregorian calendar."
 repository = "https://github.com/SimonSapin/gregor"
