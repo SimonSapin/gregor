@@ -1,18 +1,40 @@
-use super::{NaiveDateTime, UnixTimestamp, Month};
+use core::fmt;
+use super::{NaiveDateTime, DateTime, UnixTimestamp, Month, DayOfTheWeek};
 use num::{div_floor, positive_rem};
 
 pub trait TimeZone {
     fn from_timestamp(&self, t: UnixTimestamp) -> NaiveDateTime;
-    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, AmbiguousLocalTimeError>;
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, LocalTimeConversionError>;
 }
 
-/// When daylight saving makes clock go "back", the same local time hour happens twice in a row.
-/// This makes that local time ambiguous to convert to an instant.
-/// This error type is return for such a conversion.
-#[derive(Debug)]
-pub struct AmbiguousLocalTimeError;
+/// When a time zone makes clock jump forward or back at any instant in time
+/// (for example twice a year with daylight-saving time, a.k.a. summer-time period)
+/// This error is returned when either:
+///
+/// * Clocks went back and this local time occurred at multiple instants in time,
+///   making its interpretation or conversion ambiguous.
+///
+/// * Clocks jumped forward and this local time did not occur.
+///   It does not represent any real instant in time.
+///   It could be argued that a range of local times all represent the same instant,
+///   but this library does not implement the conversion that way.
+#[derive(Eq, PartialEq)]
+pub struct LocalTimeConversionError {
+    /// Make the type opaque to allow for future extensions
+    _private: (),
+}
 
-/// Implemented for time zones where `AmbiguousLocalTimeError` never occurs.
+impl fmt::Debug for LocalTimeConversionError {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "LocalTimeConversionError")
+    }
+}
+
+/// Implemented for time zones where `LocalTimeConversionError` never occurs,
+/// namely for `Utc` and `FixedOffsetFromUtc`.
+///
+/// Any UTC-offset change in a time zone creates local times that either don’t occur or occur twice.
+/// `TimeZone::to_timestamp` returns `Err(LocalTimeConversionError)` for such local times.
 pub trait UnambiguousTimeZone: TimeZone {
     fn to_unambiguous_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
         self.to_timestamp(d).unwrap()
@@ -38,7 +60,7 @@ impl TimeZone for Utc {
         NaiveDateTime::new(year, month, day, hour, minute, second)
     }
 
-    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, AmbiguousLocalTimeError> {
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, LocalTimeConversionError> {
         Ok(UnixTimestamp(
             i64::from(days_since_unix(d)) * SECONDS_PER_DAY
             + i64::from(d.hour) * SECONDS_PER_HOUR
@@ -86,7 +108,7 @@ impl TimeZone for FixedOffsetFromUtc {
         Utc.from_timestamp(UnixTimestamp(seconds))
     }
 
-    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, AmbiguousLocalTimeError> {
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, LocalTimeConversionError> {
         // Pretend this is UTC to obtain seconds since *this time zone*’s midnight of 1970-01-01.
         let seconds = Utc.to_unambiguous_timestamp(d).0;
 
@@ -94,6 +116,120 @@ impl TimeZone for FixedOffsetFromUtc {
         // (with more seconds), so *subtract* the offset to make a Unix timestamp.
         Ok(UnixTimestamp(seconds - i64::from(self.seconds_ahead_of_utc)))
     }
+}
+
+pub trait DaylightSaving {
+    fn offset_outside_dst(&self) -> FixedOffsetFromUtc;
+    fn offset_during_dst(&self) -> FixedOffsetFromUtc;
+    fn is_in_dst(&self, t: UnixTimestamp) -> bool;
+}
+
+impl<Tz: DaylightSaving> TimeZone for Tz {
+    fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
+        let offset = if self.is_in_dst(u) {
+            self.offset_during_dst()
+        } else {
+            self.offset_outside_dst()
+        };
+        offset.from_timestamp(u)
+    }
+
+    fn to_timestamp(&self, d: &NaiveDateTime) -> Result<UnixTimestamp, LocalTimeConversionError> {
+        // The actual timestamp/instant is one of these two:
+        let assuming_outside = self.offset_outside_dst().to_unambiguous_timestamp(d);
+        let assuming_during = self.offset_during_dst().to_unambiguous_timestamp(d);
+
+        // Let’s take Central Europe for example.
+        // When converted to UTC, `assuming_outside` and `assuming_during` respectively
+        // represent date-times one hour and two hours before `d`.
+        // They are one hour apart.
+        //
+        // If both timestamps are in the same DST period (during DST or outside)
+        // then we know for sure which of `assuming_outside` or `assuming_during` is correct.
+        //
+        // If they disagree, that means their one hour span contains a DST change:
+        //
+        // * 1 am UTC is between `d - 2 hours` and `d - 1 hour`
+        // * `d - 2 hours` < 1am UTC, and 1am UTC <= `d - 1 hour`
+        // * `d` < 3 am local time, and 2 am local time <= `d`
+        // * `d` is between 2 am and 3 am local time.
+        //
+        // * In October when clocks go "back", this kind of local time happens twice the same day:
+        //   it’s ambiguous.
+        // * In March when clocks go "forward", that hour is skipped entirely.
+        //   This kind of local time does not exist. This `d` value might come from buggy code.
+        match (self.is_in_dst(assuming_outside), self.is_in_dst(assuming_during)) {
+            (true, true) => Ok(assuming_during),
+            (false, false) => Ok(assuming_outside),
+            _ => Err(LocalTimeConversionError { _private: () }),
+        }
+    }
+}
+
+/// CET (Central European Time) / CEST (Central European Summer Time)
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
+pub struct CentralEurope;
+
+impl DaylightSaving for CentralEurope {
+    fn offset_outside_dst(&self) -> FixedOffsetFromUtc {
+        FixedOffsetFromUtc::from_hours_and_minutes(1, 0)
+    }
+
+    fn offset_during_dst(&self) -> FixedOffsetFromUtc {
+        FixedOffsetFromUtc::from_hours_and_minutes(2, 0)
+    }
+
+    fn is_in_dst(&self, t: UnixTimestamp) -> bool {
+        use Month::*;
+
+        let d = DateTime::from_timestamp(t, Utc);
+
+        // Directive 2000/84/EC of the European Parliament and of the Council
+        // of 19 January 2001 on summer-time arrangements
+        // http://eur-lex.europa.eu/legal-content/EN/ALL/?uri=CELEX:32000L0084
+        //
+        // > Article 1
+        //
+        // > For the purposes of this Directive "summer-time period"
+        // > shall mean the period of the year
+        // > during which clocks are put forward by 60 minutes compared with the rest of the year.
+        // >
+        // > Article 2
+        // >
+        // > From 2002 onwards, the summer-time period shall begin, in every Member State,
+        // > at 1.00 a.m., Greenwich Mean Time, on the last Sunday in March.
+        // >
+        // > Article 3
+        // >
+        // > From 2002 onwards, the summer-time period shall end, in every Member State,
+        // > at 1.00 a.m., Greenwich Mean Time, on the last Sunday in October.
+        if d.month() < March || d.month() > October {
+            false
+        } else if d.month() > March && d.month() < October {
+            true
+        } else if d.month() == March {
+            !before_last_sunday_1_am(&d)
+        } else if d.month() == October {
+            before_last_sunday_1_am(&d)
+        } else {
+            unreachable!()
+        }
+    }
+}
+
+fn before_last_sunday_1_am(d: &DateTime<Utc>) -> bool {
+    let last_sunday = last_of_the_month(d, DayOfTheWeek::Sunday);
+    d.day() < last_sunday || (
+        d.day() == last_sunday &&
+        (d.hour(), d.minute(), d.second()) < (1, 0, 0)
+    )
+}
+
+fn last_of_the_month(d: &DateTime<Utc>, requested_dow: DayOfTheWeek) -> u8 {
+    let last_day = d.month().length(d.year().into());
+    let last_dow = NaiveDateTime::new(d.year(), d.month(), last_day, 0, 0, 0).day_of_the_week();
+    let difference = i32::from(last_dow.to_iso_number()) - i32::from(requested_dow.to_iso_number());
+    last_day - (positive_rem(difference, 7) as u8)
 }
 
 pub fn days_since_unix(d: &NaiveDateTime) -> i32 {

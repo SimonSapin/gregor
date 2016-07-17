@@ -196,3 +196,81 @@ fn day_of_the_week() {
     // > (November 24, 4714 BC, in the proleptic Gregorian calendar)
     assert_eq!(NaiveDateTime::new(-4713, November, 24, 0, 0, 0).day_of_the_week(), Monday);
 }
+
+// At some point I was skeptical of `#[derive(PartialOrd, Ord)]` on enums,
+// but the bug turned out to be somewhere else.
+#[test]
+fn month_ord() {
+    assert!( (January == January));
+    assert!(!(January <  January));
+    assert!( (January <= January));
+    assert!(!(January >  January));
+    assert!( (January >= January));
+
+    assert!(!(January == February));
+    assert!( (January <  February));
+    assert!( (January <= February));
+    assert!(!(January >  February));
+    assert!(!(January >= February));
+
+    assert!(!(February == January));
+    assert!(!(February <  January));
+    assert!(!(February <= January));
+    assert!( (February >  January));
+    assert!( (February >= January));
+}
+
+#[test]
+fn central_europe_dst() {
+    macro_rules! assert_convertions {
+        ($y: expr, $m: expr, $d: expr, [$utc_h: expr, $local_h: expr], $min: expr, $s: expr) => {
+            let utc = DateTime::new(Utc, $y, $m, $d, $utc_h, $min, $s);
+            let local = DateTime::new(CentralEurope, $y, $m, $d, $local_h, $min, $s);
+            assert_eq!(utc.convert_time_zone(CentralEurope), Ok(local));
+            assert_eq!(local.convert_time_zone(Utc), Ok(utc));
+        }
+    }
+
+    macro_rules! assert_ambiguous {
+        ($y: expr, $m: expr, $d: expr, [$utc_h: expr, $local_h: expr], $min: expr, $s: expr) => {
+            let utc = DateTime::new(Utc, $y, $m, $d, $utc_h, $min, $s);
+            let local = DateTime::new(CentralEurope, $y, $m, $d, $local_h, $min, $s);
+            assert_eq!(utc.convert_time_zone(CentralEurope), Ok(local));
+            assert!(local.convert_time_zone(Utc).is_err());
+        }
+    }
+
+    macro_rules! test_transitions {
+        ($year: expr, March $march_transition_day: expr,
+                      October $october_transition_day: expr) => {
+            assert_convertions!($year, January, 1, [15, 16], 0, 0);
+            assert_convertions!($year, March, $march_transition_day - 1, [15, 16], 0, 0);
+            assert_convertions!($year, March, $march_transition_day, [0, 1], 0, 0);
+            assert_convertions!($year, March, $march_transition_day, [0, 1], 59, 59);
+            assert_convertions!($year, March, $march_transition_day, [1, 3], 0, 0);
+            assert_convertions!($year, March, $march_transition_day, [15, 17], 0, 0);
+            assert_convertions!($year, June, 7, [15, 17], 0, 0);
+            assert_convertions!($year, October, $october_transition_day - 1, [15, 17], 0, 0);
+
+            assert_ambiguous!($year, October, $october_transition_day, [0, 2], 0, 0);
+            assert_ambiguous!($year, October, $october_transition_day, [0, 2], 59, 59);
+            assert_ambiguous!($year, October, $october_transition_day, [1, 2], 0, 0);
+            assert_ambiguous!($year, October, $october_transition_day, [1, 2], 59, 59);
+
+            assert_convertions!($year, October, $october_transition_day, [2, 3], 0, 0);
+            assert_convertions!($year, October, $october_transition_day, [15, 16], 0, 0);
+            assert_convertions!($year, December, 31, [15, 16], 0, 0);
+        }
+    }
+
+    // https://en.wikipedia.org/wiki/Summer_Time_in_Europe#Exact_transition_dates
+    test_transitions!(2012, March 25, October 28);
+    test_transitions!(2013, March 31, October 27);
+    test_transitions!(2014, March 30, October 26);
+    test_transitions!(2015, March 29, October 25);
+    test_transitions!(2016, March 27, October 30);
+    test_transitions!(2017, March 26, October 29);
+    test_transitions!(2018, March 25, October 28);
+    test_transitions!(2019, March 31, October 27);
+    test_transitions!(2020, March 29, October 25);
+}

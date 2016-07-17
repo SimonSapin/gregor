@@ -10,8 +10,8 @@ mod time_zones;
 use core::fmt;
 use num::positive_rem;
 use time_zones::days_since_unix;
-pub use time_zones::{TimeZone, AmbiguousLocalTimeError, UnambiguousTimeZone,
-                     Utc, FixedOffsetFromUtc};
+pub use time_zones::{TimeZone, LocalTimeConversionError, UnambiguousTimeZone, DaylightSaving,
+                     Utc, FixedOffsetFromUtc, CentralEurope};
 
 /// In seconds since 1970-01-01 00:00:00 UTC.
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
@@ -80,6 +80,15 @@ impl<Tz: TimeZone> DateTime<Tz> {
             time_zone: time_zone,
         }
     }
+
+    pub fn to_timestamp(&self) -> Result<UnixTimestamp, LocalTimeConversionError> {
+        self.time_zone.to_timestamp(&self.naive)
+    }
+
+    pub fn convert_time_zone<NewTz: TimeZone>(&self, new_time_zone: NewTz)
+                                              -> Result<DateTime<NewTz>, LocalTimeConversionError> {
+        Ok(DateTime::from_timestamp(try!(self.to_timestamp()), new_time_zone))
+    }
 }
 
 impl NaiveDateTime {
@@ -96,9 +105,7 @@ impl NaiveDateTime {
 
     pub fn day_of_the_week(&self) -> DayOfTheWeek {
         const JANUARY_1ST_1970: DayOfTheWeek = DayOfTheWeek::Thursday;
-        let number = i32::from(JANUARY_1ST_1970.to_iso_number()) + days_since_unix(self);
-        let number = positive_rem((number - 1), 7) + 1;  // Normalize to 1...7
-        DayOfTheWeek::from_iso_number(number as u8).unwrap()
+        JANUARY_1ST_1970.add_days(days_since_unix(self))
     }
 }
 
@@ -143,12 +150,14 @@ macro_rules! declare_month {
     ([ $((
         $name: ident,
         $number: expr,
+        $length_in_common_years: expr,
+        $length_in_leap_years: expr,
         $first_day_in_common_years: expr,
         $last_day_in_common_years: expr,
         $first_day_in_leap_years: expr,
         $last_day_in_leap_years: expr
     )),+ ]) => {
-        #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+        #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
         pub enum Month {
             $(
                 $name = $number,
@@ -172,6 +181,21 @@ macro_rules! declare_month {
                     $(
                         Month::$name => $number,
                     )+
+                }
+            }
+
+            pub fn length(self, year_kind: YearKind) -> u8 {
+                match year_kind {
+                    YearKind::Common => match self {
+                        $(
+                            Month::$name => $length_in_common_years,
+                        )+
+                    },
+                    YearKind::Leap => match self {
+                        $(
+                            Month::$name => $length_in_leap_years,
+                        )+
+                    },
                 }
             }
 
@@ -249,6 +273,13 @@ macro_rules! declare_day_of_the_week {
                         DayOfTheWeek::$name => $number,
                     )+
                 }
+            }
+
+            // What day of the week is it this many days after this day of the week?
+            fn add_days(self, days: i32) -> Self {
+                let number = i32::from(self.to_iso_number()) + days;
+                let number = positive_rem((number - 1), 7) + 1;  // Normalize to 1...7
+                DayOfTheWeek::from_iso_number(number as u8).unwrap()
             }
         }
     }

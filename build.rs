@@ -26,6 +26,8 @@ fn main() {
         (
             Ident(name),
             /* number = */ i + 1,  // i starts at 0
+            length_common,
+            length_leap,
             /* first_day_in_common_years = */ running_sum_common - length_common,
             /* last_day_in_common_years = */ running_sum_common - 1,
             /* first_day_in_leap_years = */ running_sum_leap - length_leap,
