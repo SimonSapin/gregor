@@ -43,4 +43,23 @@ fn main() {
     w!("        }}");
     w!("    }}");
     w!("}}");
+
+    w!("");
+    w!("macro_rules! with_day_of_the_week_data {{");
+    w!("    ($macro_name: ident) => {{");
+    w!("        $macro_name! {{");
+    for (i, name) in [
+        "Monday",
+        "Tuesday",
+        "Wednesday",
+        "Thursday",
+        "Friday",
+        "Saturday",
+        "Sunday",
+    ].iter().enumerate() {
+        w!("{} = {},", name, i + 1);  // i starts at 0
+    }
+    w!("        }}");
+    w!("    }}");
+    w!("}}");
 }

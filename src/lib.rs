@@ -211,6 +211,41 @@ macro_rules! declare_month {
     }
 }
 
+macro_rules! declare_day_of_the_week {
+    ( $( $name: ident = $number: expr, )+ ) => {
+        #[derive(Debug, Eq, PartialEq, Copy, Clone)]
+        pub enum DayOfTheWeek {
+            $(
+                $name = $number,
+            )+
+        }
+
+        impl DayOfTheWeek {
+            /// Return the day of the week from its number, where Monday to Sunday are 1 to 7
+            /// in accordance with ISO 8601.
+            pub fn from_iso_number(n: u8) -> Option<Self> {
+                match n {
+                    $(
+                        $number => Some(DayOfTheWeek::$name),
+                    )+
+                    _ => None
+                }
+            }
+
+            /// Return the number of this day of the week, where Monday to Sunday are 1 to 7
+            /// in accordance with ISO 8601.
+            pub fn to_iso_number(self) -> u8 {
+                match self {
+                    $(
+                        DayOfTheWeek::$name => $number,
+                    )+
+                }
+            }
+        }
+    }
+}
+
 include!(concat!(env!("OUT_DIR"), "/generated_data.rs"));
 
 with_month_data!(declare_month);
+with_day_of_the_week_data!(declare_day_of_the_week);

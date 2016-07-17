@@ -1,6 +1,7 @@
 use super::*;
 use time_zones::{days_since_unix, leap_days_since_y0};
 use Month::*;
+use DayOfTheWeek::*;
 
 #[test]
 fn fmt() {
@@ -155,4 +156,21 @@ fn fixed_offset_from_utc() {
     assert_eq!(tz.to_timestamp(&dt), t);
     assert_eq!(tz.from_timestamp(t), dt);
     assert_eq!(Utc.from_timestamp(t), utc_dt);
+}
+
+#[test]
+fn numbers() {
+    assert_eq!(January.to_number(), 1);
+    assert_eq!(December.to_number(), 12);
+    assert_eq!(Month::from_number(0), None);
+    assert_eq!(Month::from_number(1), Some(January));
+    assert_eq!(Month::from_number(12), Some(December));
+    assert_eq!(Month::from_number(13), None);
+
+    assert_eq!(Monday.to_iso_number(), 1);
+    assert_eq!(Sunday.to_iso_number(), 7);
+    assert_eq!(DayOfTheWeek::from_iso_number(0), None);
+    assert_eq!(DayOfTheWeek::from_iso_number(1), Some(Monday));
+    assert_eq!(DayOfTheWeek::from_iso_number(7), Some(Sunday));
+    assert_eq!(DayOfTheWeek::from_iso_number(8), None);
 }
