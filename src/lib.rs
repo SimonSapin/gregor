@@ -139,21 +139,14 @@ impl From<i32> for YearKind {
 }
 
 macro_rules! declare_month {
-    (
-        $(
-            $name: ident {
-                number = $number: expr,
-                common_years = {
-                    first_day = $first_day_in_common_years: expr,
-                    last_day = $last_day_in_common_years: expr,
-                },
-                leap_years = {
-                    first_day = $first_day_in_leap_years: expr,
-                    last_day = $last_day_in_leap_years: expr,
-                },
-            },
-        )+
-    ) => {
+    ([ $((
+        $name: ident,
+        $number: expr,
+        $first_day_in_common_years: expr,
+        $last_day_in_common_years: expr,
+        $first_day_in_leap_years: expr,
+        $last_day_in_leap_years: expr
+    )),+ ]) => {
         #[derive(Debug, Eq, PartialEq, Copy, Clone)]
         pub enum Month {
             $(
@@ -224,7 +217,10 @@ macro_rules! declare_month {
 }
 
 macro_rules! declare_day_of_the_week {
-    ( $( $name: ident = $number: expr, )+ ) => {
+    ([ $((
+        $name: ident,
+        $number: expr
+    )),+ ]) => {
         #[derive(Debug, Eq, PartialEq, Copy, Clone)]
         pub enum DayOfTheWeek {
             $(

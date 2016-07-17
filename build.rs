@@ -1,20 +1,13 @@
-use std::{env, fs, path};
+use std::{env, fmt, fs, path};
 use std::io::Write;
 
 fn main() {
-    let path = path::Path::new(&env::var("OUT_DIR").unwrap()).join("generated_data.rs");
-    let mut f = fs::File::create(&path).unwrap();
-    macro_rules! w {
-        ($($tt: tt)*) => {{ writeln!(f, $($tt)*).unwrap(); }}
-    }
-
+    // The total number of days in the year up to the current month, inclusive,
+    // for common (non-leap) years and leap years.
     let mut running_sum_common = 0;
     let mut running_sum_leap = 0;
-
-    w!("macro_rules! with_month_data {{");
-    w!("    ($macro_name: ident) => {{");
-    w!("        $macro_name! {{");
-    for (i, &(name, length_common, length_leap)) in [
+    let month_data = [
+        // Name of the month with its length (number of days) in common years and leap years.
         ("January", 31, 31),
         ("February", 28, 29),
         ("March", 31, 31),
@@ -27,28 +20,20 @@ fn main() {
         ("October", 31, 31),
         ("November", 30, 30),
         ("December", 31, 31),
-    ].iter().enumerate() {
-        w!("{} {{", name);
-        w!("    number = {},", i + 1);  // i starts at 0
-        w!("    common_years = {{ first_day = {}, last_day = {}, }},",
-           running_sum_common,
-           running_sum_common + length_common - 1);
-        w!("    leap_years = {{ first_day = {}, last_day = {}, }},",
-           running_sum_leap,
-           running_sum_leap + length_leap - 1);
-        w!("}},");
+    ].iter().enumerate().map(|(i, &(name, length_common, length_leap))| {
         running_sum_common += length_common;
         running_sum_leap += length_leap;
-    }
-    w!("        }}");
-    w!("    }}");
-    w!("}}");
+        (
+            Ident(name),
+            /* number = */ i + 1,  // i starts at 0
+            /* first_day_in_common_years = */ running_sum_common - length_common,
+            /* last_day_in_common_years = */ running_sum_common - 1,
+            /* first_day_in_leap_years = */ running_sum_leap - length_leap,
+            /* last_day_in_leap_years = */ running_sum_leap - 1,
+        )
+    }).collect::<Vec<_>>();
 
-    w!("");
-    w!("macro_rules! with_day_of_the_week_data {{");
-    w!("    ($macro_name: ident) => {{");
-    w!("        $macro_name! {{");
-    for (i, name) in [
+    let day_of_the_week_data = [
         "Monday",
         "Tuesday",
         "Wednesday",
@@ -56,10 +41,30 @@ fn main() {
         "Friday",
         "Saturday",
         "Sunday",
-    ].iter().enumerate() {
-        w!("{} = {},", name, i + 1);  // i starts at 0
+    ].iter().enumerate().map(|(i, &name)| (Ident(name), i + 1)).collect::<Vec<_>>();
+
+    let path = path::Path::new(&env::var("OUT_DIR").unwrap()).join("generated_data.rs");
+    let mut file = fs::File::create(&path).unwrap();
+
+    macro_rules! with {
+        ($variable: ident) => {
+            writeln!(
+                file,
+                "macro_rules! with_{} {{ ($macro_name: ident) => {{ $macro_name!({:?}); }} }}",
+                stringify!($variable),
+                $variable
+            ).unwrap()
+        }
     }
-    w!("        }}");
-    w!("    }}");
-    w!("}}");
+    with!(month_data);
+    with!(day_of_the_week_data);
+}
+
+/// Wrap a string to format without quotes.
+struct Ident(&'static str);
+
+impl fmt::Debug for Ident {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
 }
