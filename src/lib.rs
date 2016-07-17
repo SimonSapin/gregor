@@ -139,8 +139,6 @@ impl From<DateTime<Utc>> for UnixTimestamp {
 
 /// How many leap days occured between January of year 0 and January of the given year
 /// (in Gregorian calendar).
-//
-// FIXME: This may be incorrect for year negative years.
 fn leap_days_since_y0(year: i32) -> i32 {
     if year > 0 {
         let year = year - 1;  // Don’t include Feb 29 of the given year, if any.
