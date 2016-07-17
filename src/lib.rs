@@ -11,7 +11,12 @@ include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub struct UnixTimestamp(pub i64);
 
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+pub trait TimeZone {
+    fn from_timestamp(&self, t: UnixTimestamp) -> NaiveDateTime;
+    fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp;
+}
+
+#[derive(Debug, Eq, PartialEq, Copy, Clone, Default)]
 pub struct Utc;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
@@ -117,8 +122,24 @@ fn positive_rem(dividend: i64, divisor: i64) -> i64 {
     }
 }
 
-impl From<UnixTimestamp> for DateTime<Utc> {
+impl<Tz: Default + TimeZone> From<UnixTimestamp> for DateTime<Tz> {
     fn from(u: UnixTimestamp) -> Self {
+        let tz = Tz::default();
+        DateTime {
+            naive: tz.from_timestamp(u),
+            time_zone: tz,
+        }
+    }
+}
+
+impl<Tz: TimeZone> From<DateTime<Tz>> for UnixTimestamp {
+    fn from(datetime: DateTime<Tz>) -> Self {
+        datetime.time_zone.to_timestamp(&datetime.naive)
+    }
+}
+
+impl TimeZone for Utc {
+    fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
         let days_since_unix = div_floor!(u.0, SECONDS_PER_DAY) as i32;
         let days = days_since_unix + days_since_d0(1970);
         let year = div_floor!(days * 400, DAYS_PER_400YEARS) as i32;
@@ -127,20 +148,15 @@ impl From<UnixTimestamp> for DateTime<Utc> {
         let hour = positive_rem(div_floor!(u.0, SECONDS_PER_HOUR), 24) as u8;
         let minute = positive_rem(div_floor!(u.0, SECONDS_PER_MINUTE), 60) as u8;
         let second = positive_rem(u.0, 60) as u8;
-        DateTime {
-            naive: NaiveDateTime::new(year, month, day, hour, minute, second),
-            time_zone: Utc,
-        }
+        NaiveDateTime::new(year, month, day, hour, minute, second)
     }
-}
 
-impl From<DateTime<Utc>> for UnixTimestamp {
-    fn from(datetime: DateTime<Utc>) -> Self {
+    fn to_timestamp(&self, d: &NaiveDateTime) -> UnixTimestamp {
         UnixTimestamp(
-            i64::from(datetime.naive.days_since_unix()) * SECONDS_PER_DAY
-            + i64::from(datetime.hour()) * SECONDS_PER_HOUR
-            + i64::from(datetime.minute()) * SECONDS_PER_MINUTE
-            + i64::from(datetime.second())
+            i64::from(d.days_since_unix()) * SECONDS_PER_DAY
+            + i64::from(d.hour) * SECONDS_PER_HOUR
+            + i64::from(d.minute) * SECONDS_PER_MINUTE
+            + i64::from(d.second)
         )
     }
 }
