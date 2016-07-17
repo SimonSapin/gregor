@@ -1,9 +1,11 @@
 #![no_std]
 
-use core::fmt;
+#[cfg(any(test, feature = "system_time"))] #[macro_use] extern crate std;
 
-#[cfg(feature = "system_time")]
-mod system_time;
+#[cfg(feature = "system_time")] mod system_time;
+#[cfg(test)] mod tests;
+
+use core::fmt;
 
 include!(concat!(env!("OUT_DIR"), "/month_generated.rs"));
 
@@ -214,8 +216,3 @@ impl From<i32> for YearKind {
         }
     }
 }
-
-#[cfg(test)] #[macro_use] extern crate std;
-
-#[cfg(test)]
-mod tests;

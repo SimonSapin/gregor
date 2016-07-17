@@ -1,6 +1,4 @@
-extern crate std;
-
-use self::std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
+use std::time::{Duration as StdDuration, SystemTime, UNIX_EPOCH};
 use super::{UnixTimestamp, DateTime};
 
 impl From<SystemTime> for UnixTimestamp {
