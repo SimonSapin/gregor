@@ -91,11 +91,19 @@ impl NaiveDateTime {
 }
 
 /// Integer divison that rounds towards negative infinity
-fn div_floor(dividend: i64, divisor: i64) -> i64 {
-    if dividend > 0 {
-        dividend / divisor
-    } else {
-        (dividend + 1 - divisor) / divisor
+// This is a macro in order to work with either i32 or i64.
+// Generic integers with traits are a pain.
+macro_rules! div_floor {
+    ($dividend: expr, $divisor: expr) => {
+        {
+            let dividend = $dividend;
+            let divisor = $divisor;
+            if dividend > 0 {
+                dividend / divisor
+            } else {
+                (dividend + 1 - divisor) / divisor
+            }
+        }
     }
 }
 
@@ -111,13 +119,13 @@ fn positive_rem(dividend: i64, divisor: i64) -> i64 {
 
 impl From<UnixTimestamp> for DateTime<Utc> {
     fn from(u: UnixTimestamp) -> Self {
-        let days_since_unix = div_floor(u.0, SECONDS_PER_DAY) as i32;
+        let days_since_unix = div_floor!(u.0, SECONDS_PER_DAY) as i32;
         let days = days_since_unix + days_since_d0(1970);
-        let year = div_floor(i64::from(days) * 400, i64::from(DAYS_PER_400YEARS)) as i32;
+        let year = div_floor!(days * 400, DAYS_PER_400YEARS) as i32;
         let day_of_the_year = days - days_since_d0(year);
         let (month, day) = Month::from_day_of_the_year(day_of_the_year, year.into());
-        let hour = positive_rem(div_floor(u.0, SECONDS_PER_HOUR), 24) as u8;
-        let minute = positive_rem(div_floor(u.0, SECONDS_PER_MINUTE), 60) as u8;
+        let hour = positive_rem(div_floor!(u.0, SECONDS_PER_HOUR), 24) as u8;
+        let minute = positive_rem(div_floor!(u.0, SECONDS_PER_MINUTE), 60) as u8;
         let second = positive_rem(u.0, 60) as u8;
         DateTime {
             naive: NaiveDateTime::new(year, month, day, hour, minute, second),
