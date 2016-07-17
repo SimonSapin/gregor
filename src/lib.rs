@@ -16,8 +16,13 @@ pub struct Utc;
 
 #[derive(Eq, PartialEq, Copy, Clone)]
 pub struct DateTime<Tz> {
+    pub naive: NaiveDateTime,
     pub time_zone: Tz,
+}
 
+/// A date and time without associated time zone information.
+#[derive(Eq, PartialEq, Copy, Clone)]
+pub struct NaiveDateTime {
     /// Year number per ISO 8601.
     ///
     /// For example, 2016 AC is +2016, 1 AC is +1, 1 BC is 0, 2 BC is -1, etc.
@@ -35,8 +40,14 @@ pub struct DateTime<Tz> {
 
 impl<Tz: fmt::Debug> fmt::Debug for DateTime<Tz> {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
-        write!(formatter, "DateTime({:?}, {:04}-{:02}-{:02} {:02}:{:02}:{:02})",
-               self.time_zone, self.year, self.month as u8, self.day,
+        write!(formatter, "DateTime({:?}, {:?})", self.time_zone, self.naive)
+    }
+}
+
+impl fmt::Debug for NaiveDateTime {
+    fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        write!(formatter, "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
+               self.year, self.month as u8, self.day,
                self.hour, self.minute, self.second)
     }
 }
@@ -46,7 +57,22 @@ impl<Tz> DateTime<Tz> {
                hour: u8, minute: u8, second: u8)
                -> Self {
         DateTime {
+            naive: NaiveDateTime::new(year, month, day, hour, minute, second),
             time_zone: time_zone,
+        }
+    }
+
+    pub fn year(&self) -> i32 { self.naive.year }
+    pub fn month(&self) -> Month { self.naive.month }
+    pub fn day(&self) -> u8 { self.naive.day }
+    pub fn hour(&self) -> u8 { self.naive.hour }
+    pub fn minute(&self) -> u8 { self.naive.minute }
+    pub fn second(&self) -> u8 { self.naive.second }
+}
+
+impl NaiveDateTime {
+    pub fn new(year: i32, month: Month, day: u8, hour: u8, minute: u8, second: u8) -> Self {
+        NaiveDateTime {
             year: year,
             month: month,
             day: day,
@@ -90,14 +116,12 @@ impl From<UnixTimestamp> for DateTime<Utc> {
         let year = div_floor(i64::from(days) * 400, i64::from(DAYS_PER_400YEARS)) as i32;
         let day_of_the_year = days - days_since_d0(year);
         let (month, day) = Month::from_day_of_the_year(day_of_the_year, year.into());
+        let hour = positive_rem(div_floor(u.0, SECONDS_PER_HOUR), 24) as u8;
+        let minute = positive_rem(div_floor(u.0, SECONDS_PER_MINUTE), 60) as u8;
+        let second = positive_rem(u.0, 60) as u8;
         DateTime {
+            naive: NaiveDateTime::new(year, month, day, hour, minute, second),
             time_zone: Utc,
-            year: year,
-            month: month,
-            day: day,
-            hour: positive_rem(div_floor(u.0, SECONDS_PER_HOUR), 24) as u8,
-            minute: positive_rem(div_floor(u.0, SECONDS_PER_MINUTE), 60) as u8,
-            second: positive_rem(u.0, 60) as u8,
         }
     }
 }
@@ -105,10 +129,10 @@ impl From<UnixTimestamp> for DateTime<Utc> {
 impl From<DateTime<Utc>> for UnixTimestamp {
     fn from(datetime: DateTime<Utc>) -> Self {
         UnixTimestamp(
-            i64::from(datetime.days_since_unix()) * SECONDS_PER_DAY
-            + i64::from(datetime.hour) * SECONDS_PER_HOUR
-            + i64::from(datetime.minute) * SECONDS_PER_MINUTE
-            + i64::from(datetime.second)
+            i64::from(datetime.naive.days_since_unix()) * SECONDS_PER_DAY
+            + i64::from(datetime.hour()) * SECONDS_PER_HOUR
+            + i64::from(datetime.minute()) * SECONDS_PER_MINUTE
+            + i64::from(datetime.second())
         )
     }
 }
@@ -245,15 +269,15 @@ mod tests {
 
     #[test]
     fn days_since_unix() {
-        assert_eq!(DateTime::new(Utc, 1969, December, 31, 0, 0, 0).days_since_unix(), -1);
-        assert_eq!(DateTime::new(Utc, 1970, January, 1, 0, 0, 0).days_since_unix(), 0);
-        assert_eq!(DateTime::new(Utc, 1970, January, 2, 0, 0, 0).days_since_unix(), 1);
-        assert_eq!(DateTime::new(Utc, 1970, February, 1, 0, 0, 0).days_since_unix(), 31);
-        assert_eq!(DateTime::new(Utc, 1971, January, 1, 0, 0, 0).days_since_unix(), 365);
-        assert_eq!(DateTime::new(Utc, 1972, January, 1, 0, 0, 0).days_since_unix(), 365 * 2);
+        assert_eq!(NaiveDateTime::new(1969, December, 31, 0, 0, 0).days_since_unix(), -1);
+        assert_eq!(NaiveDateTime::new(1970, January, 1, 0, 0, 0).days_since_unix(), 0);
+        assert_eq!(NaiveDateTime::new(1970, January, 2, 0, 0, 0).days_since_unix(), 1);
+        assert_eq!(NaiveDateTime::new(1970, February, 1, 0, 0, 0).days_since_unix(), 31);
+        assert_eq!(NaiveDateTime::new(1971, January, 1, 0, 0, 0).days_since_unix(), 365);
+        assert_eq!(NaiveDateTime::new(1972, January, 1, 0, 0, 0).days_since_unix(), 365 * 2);
         // 1972 is a leap year.
-        assert_eq!(DateTime::new(Utc, 1973, January, 1, 0, 0, 0).days_since_unix(), 365 * 3 + 1);
-        assert_eq!(DateTime::new(Utc, 2016, July, 16, 0, 0, 0).days_since_unix(), 16998);
+        assert_eq!(NaiveDateTime::new(1973, January, 1, 0, 0, 0).days_since_unix(), 365 * 3 + 1);
+        assert_eq!(NaiveDateTime::new(2016, July, 16, 0, 0, 0).days_since_unix(), 16998);
     }
 
     #[test]
