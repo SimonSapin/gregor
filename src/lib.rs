@@ -2,6 +2,7 @@
 
 #[cfg(any(test, feature = "system_time"))] #[macro_use] extern crate std;
 
+mod num;
 #[cfg(feature = "system_time")] mod system_time;
 #[cfg(test)] mod tests;
 mod time_zones;

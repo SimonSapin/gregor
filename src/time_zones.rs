@@ -1,4 +1,5 @@
 use super::{NaiveDateTime, UnixTimestamp, Month};
+use num::{div_floor, positive_rem};
 
 pub trait TimeZone {
     fn from_timestamp(&self, t: UnixTimestamp) -> NaiveDateTime;
@@ -39,32 +40,15 @@ impl TimeZone for FixedOffsetFromUtc {
     }
 }
 
-/// Integer divison that rounds towards negative infinity
-// This is a macro in order to work with either i32 or i64.
-// Generic integers with traits are a pain.
-macro_rules! div_floor {
-    ($dividend: expr, $divisor: expr) => {
-        {
-            let dividend = $dividend;
-            let divisor = $divisor;
-            if dividend > 0 {
-                dividend / divisor
-            } else {
-                (dividend + 1 - divisor) / divisor
-            }
-        }
-    }
-}
-
 impl TimeZone for Utc {
     fn from_timestamp(&self, u: UnixTimestamp) -> NaiveDateTime {
-        let days_since_unix = div_floor!(u.0, SECONDS_PER_DAY) as i32;
+        let days_since_unix = div_floor(u.0, SECONDS_PER_DAY) as i32;
         let days = days_since_unix + days_since_d0(1970);
-        let year = div_floor!(days * 400, DAYS_PER_400YEARS) as i32;
+        let year = div_floor(days * 400, DAYS_PER_400YEARS) as i32;
         let day_of_the_year = days - days_since_d0(year);
         let (month, day) = Month::from_day_of_the_year(day_of_the_year, year.into());
-        let hour = positive_rem(div_floor!(u.0, SECONDS_PER_HOUR), 24) as u8;
-        let minute = positive_rem(div_floor!(u.0, SECONDS_PER_MINUTE), 60) as u8;
+        let hour = positive_rem(div_floor(u.0, SECONDS_PER_HOUR), 24) as u8;
+        let minute = positive_rem(div_floor(u.0, SECONDS_PER_MINUTE), 60) as u8;
         let second = positive_rem(u.0, 60) as u8;
         NaiveDateTime::new(year, month, day, hour, minute, second)
     }
@@ -84,16 +68,6 @@ pub fn days_since_unix(d: &NaiveDateTime) -> i32 {
     + leap_days_since_y0(d.year) - leap_days_since_y0(1970)
     + d.month.days_since_january_1st(d.year.into())
     + i32::from(d.day - 1)
-}
-
-/// Remainder within range 0..divisor, even for negative dividend
-fn positive_rem(dividend: i64, divisor: i64) -> i64 {
-    let rem = dividend % divisor;
-    if rem < 0 {
-        rem + divisor
-    } else {
-        rem
-    }
 }
 
 /// How many leap days occured between January of year 0 and January of the given year
@@ -128,4 +102,3 @@ const LEAP_DAYS_PER_400YEARS: i32 = 100 - 4 + 1;
 
 const DAYS_PER_COMMON_YEAR: i32 = 365;
 const DAYS_PER_400YEARS: i32 = DAYS_PER_COMMON_YEAR * 400 + LEAP_DAYS_PER_400YEARS;
-
