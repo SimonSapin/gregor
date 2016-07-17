@@ -46,7 +46,7 @@ impl<Tz: fmt::Debug + TimeZone> fmt::Debug for DateTime<Tz> {
 impl fmt::Debug for NaiveDateTime {
     fn fmt(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
         write!(formatter, "{:04}-{:02}-{:02} {:02}:{:02}:{:02}",
-               self.year, self.month as u8, self.day,
+               self.year, self.month.to_number(), self.day,
                self.hour, self.minute, self.second)
     }
 }
@@ -150,6 +150,25 @@ macro_rules! declare_month {
         }
 
         impl Month {
+            /// Return the month from its number, between 1 and 12.
+            pub fn from_number(n: u8) -> Option<Self> {
+                match n {
+                    $(
+                        $number => Some(Month::$name),
+                    )+
+                    _ => None
+                }
+            }
+
+            /// Return the number of this month, between 1 and 12.
+            pub fn to_number(self) -> u8 {
+                match self {
+                    $(
+                        Month::$name => $number,
+                    )+
+                }
+            }
+
             /// Days between Jan 1st and the first day of this month.
             fn days_since_january_1st(self, year_kind: YearKind) -> i32 {
                 match year_kind {
