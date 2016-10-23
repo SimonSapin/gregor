@@ -91,6 +91,17 @@ impl<Tz: TimeZone> DateTime<Tz> {
     }
 }
 
+impl<Tz: UnambiguousTimeZone> DateTime<Tz> {
+    pub fn to_unambiguous_timestamp(&self) -> UnixTimestamp {
+        self.time_zone.to_unambiguous_timestamp(&self.naive)
+    }
+
+    pub fn convert_unambiguous_time_zone<NewTz: TimeZone>(&self, new_time_zone: NewTz) -> DateTime<NewTz> {
+        DateTime::from_timestamp(self.to_unambiguous_timestamp(), new_time_zone)
+    }
+}
+
+
 impl NaiveDateTime {
     pub fn new(year: i32, month: Month, day: u8, hour: u8, minute: u8, second: u8) -> Self {
         NaiveDateTime {
