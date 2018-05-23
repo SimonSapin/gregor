@@ -127,6 +127,7 @@ fn conversions() {
     assert_convertions!(1_468_702_726, 2016, July, 16, 20, 58, 46);
     assert_convertions!(10_000_000_000, 2286, November, 20, 17, 46, 40);
     assert_convertions!(400_000_000_000, 14645, June, 30, 15, 6, 40);
+    assert_convertions!(1_519_862_403, 2018, March, 1, 0, 0, 3);
 }
 
 #[cfg(feature = "system_time")]

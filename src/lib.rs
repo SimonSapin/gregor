@@ -232,7 +232,7 @@ macro_rules! declare_month {
                 match year_kind {
                     YearKind::Common => match day {
                         $(
-                            $first_day_in_common_years ... $last_day_in_leap_years => {
+                            $first_day_in_common_years ... $last_day_in_common_years => {
                                 (Month::$name, (day - $first_day_in_common_years + 1) as u8)
                             }
                         )+
