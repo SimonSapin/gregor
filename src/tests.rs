@@ -275,3 +275,75 @@ fn central_europe_dst() {
     test_transitions!(2019, March 31, October 27);
     test_transitions!(2020, March 29, October 25);
 }
+
+#[test]
+fn unix_timestamp_ord() {
+    assert!(UnixTimestamp(-2) < UnixTimestamp(-1));
+    assert!(UnixTimestamp(-2) <= UnixTimestamp(-1));
+    assert!(UnixTimestamp(0) == UnixTimestamp(0));
+    assert!(UnixTimestamp(2) > UnixTimestamp(1));
+    assert!(UnixTimestamp(2) >= UnixTimestamp(1));
+}
+
+#[test]
+fn naive_date_time_ord() {
+    let ndt1 = NaiveDateTime {
+        year: 2000,
+        month: Month::May,
+        day: 10,
+        hour: 12,
+        minute: 30,
+        second: 45,
+    };
+
+    let ndt2 = NaiveDateTime {
+        second: 44,
+        .. ndt1
+    };
+
+    assert!(ndt2 < ndt1);
+
+    let ndt3 = NaiveDateTime {
+        year: 2001,
+        month: Month::April,
+        .. ndt1
+    };
+
+    assert!(ndt1 < ndt3);
+
+    let ndt10 = NaiveDateTime {
+        second: 46,
+        .. ndt1
+    };
+    let ndt11 = NaiveDateTime {
+        minute: 31,
+        .. ndt1
+    };
+    let ndt12 = NaiveDateTime {
+        hour: 13,
+        .. ndt1
+    };
+    let ndt13 = NaiveDateTime {
+        day: 11,
+        .. ndt1
+    };
+    let ndt14 = NaiveDateTime {
+        month: Month::June,
+        .. ndt1
+    };
+    let ndt15 = NaiveDateTime {
+        year: 2001,
+        .. ndt1
+    };
+
+    let order = [ndt1, ndt10, ndt11, ndt12, ndt13, ndt14, ndt15];
+
+    for i in 0..order.len() {
+        for j in i..order.len() {
+            assert!(order[i] <= order[j]);
+            if i != j {
+                assert!(order[i] < order[j]);
+            }
+        }
+    }
+}

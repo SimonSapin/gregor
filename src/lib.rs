@@ -14,17 +14,17 @@ pub use time_zones::{TimeZone, LocalTimeConversionError, UnambiguousTimeZone, Da
                      Utc, FixedOffsetFromUtc, CentralEurope};
 
 /// In seconds since 1970-01-01 00:00:00 UTC.
-#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct UnixTimestamp(pub i64);
 
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct DateTime<Tz: TimeZone> {
     pub naive: NaiveDateTime,
     pub time_zone: Tz,
 }
 
 /// A date and time without associated time zone information.
-#[derive(Eq, PartialEq, Copy, Clone)]
+#[derive(Eq, PartialEq, Ord, PartialOrd, Copy, Clone)]
 pub struct NaiveDateTime {
     /// Year number per ISO 8601.
     ///
